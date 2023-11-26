@@ -1,0 +1,1612 @@
+<script type="text/javascript">
+
+class node {
+	constructor(posX,posY,radius,name) {
+    	this.posX = posX;
+        this.posY = posY;
+        this.r = radius;
+        this.name = name;
+        this.activation = 0;
+        this.colour = 'standard';
+    }
+}
+
+const centerX = 600;
+const centerY = 400;
+const ringDiameter = 600;
+const randomPadding = 50;
+const layerSpacing = 400;
+const nodeRadius = 15;
+const curvature = 20;
+
+var backColour = '#D3D3D3';
+var deadColour = '#82C785';
+var borderColour = '#000000';
+var activeColour = '#DDDD00';
+var negativeColour = '#27B1FF';
+
+var numNodes = 0;
+var nodesList = [];
+var AM = [[]]; 
+var RM = [[]]; // Relative matrix of AM with largest number as 1 and smallest number as 0
+var RzM = [[]]; // Relative-zero matrix of AM with largest absolute number as 1 and 0 as 0
+var nodeArr = 'circ';
+var ANNlisting = [];
+var visableNodes = 0;
+var visableArcs = [];
+var visableArrowHeads = [];
+var visableText = [];
+var modifications = [];
+var netFile;
+
+// Run when the number of nodes are updated, or when ANN settings change
+function NodesUpdate() {
+	updateMatrix();
+    updateNetworkNodes();
+    updateNetworkArcs();
+    colourReset();
+    updateActivation();
+    colourNodes();
+}
+
+// Run whenever a weight in the user matrix is changed
+function WeightUpdate() {
+	updateMatrixValues();
+    updateNetworkArcs();
+    activationReset();
+    colourNodes();
+}
+
+// Run when an activation node is changed
+function ActivationUpdate() {
+	updateActivation();
+    SellbergOperator();
+    colourNodes();
+    activationEquilibriumError();
+}
+
+// Opens and closes the customisation settings
+function showSettings() {
+	if (document.getElementById('settings').style.display == 'none') {
+    	document.getElementById('settings').setAttribute('style','display: true');
+        document.getElementById('showButton').innerHTML = 'Hide';
+    } else {
+    	document.getElementById('settings').setAttribute('style','display: none');
+        document.getElementById('showButton').innerHTML = 'Show';
+    }
+}
+
+// Run whenever a general colour in the customisation settings is changed
+function newColours() {
+    backColour = document.getElementById('backCol').value;
+    borderColour = document.getElementById('bordCol').value;
+    deadColour = document.getElementById('deadCol').value;
+    activeColour = document.getElementById('actCol').value;
+    negativeColour = document.getElementById('negCol').value;
+    colourEverything();
+}
+
+// Resets all customisations and modifications
+function resetSettings() {
+	backColour = '#D3D3D3';
+	borderColour = '#000000';
+	deadColour = '#82C785';
+	activeColour = '#DDDD00';
+    document.getElementById('backCol').value = backColour;
+    document.getElementById('deadCol').value = deadColour;
+    document.getElementById('bordCol').value = borderColour;
+    document.getElementById('actCol').value = activeColour;
+    colourEverything();
+    for (i=0;i<nodesList.length;i++) {
+    	nodesList[i].colour = 'standard';
+    }
+    colourNodes();
+    modifications = [];
+    applyTextModification();
+}
+
+// Run when a specific node colour in the customisation settings is changed
+function colourANode() {
+	var setColour = document.getElementById('specCol').value;
+    var target = parseInt(document.getElementById('chooseNode').value);
+    nodesList[target].colour = setColour;
+    modifications.push("Colour "+target+" "+setColour);
+    colourEverything();
+}
+
+// Changes the colour of all matrix and activation user boxes
+function colourEverything() {
+	document.getElementById('background').setAttribute('fill',backColour);
+    for (i=0;i<nodesList.length;i++) {
+        document.getElementById("nodeBox"+i).style.backgroundColor = deadColour;
+        document.getElementById("nodeBoxLabel"+i).style.backgroundColor = deadColour;
+        for (j=0;j<nodesList.length;j++) {
+        	document.getElementById(""+i+","+j).style.backgroundColor = deadColour;
+        	if (i == j) {
+                document.getElementById(""+i+","+j).style.backgroundColor = colourPic(deadColour,backColour,0.4);
+            }
+        }
+    }
+    updateNetworkArcs(); // Arranges the visual arcs
+    colourNodes(); // Colour nodes and their connected arcs according to their activation
+}
+
+// Adds text to 'modifications' list
+function addText() {
+	var text = document.getElementById('textToAdd').value;
+    modifications.push("Text "+20+" "+40+" "+text);
+    applyTextModification();
+}
+
+// Adds text anchored to a node to 'modifications' list
+function addTextToNode() {
+	var text = document.getElementById('textToAdd').value;
+    var anchorNode = document.getElementById('chooseNodeText').value;
+    modifications.push("TextN "+anchorNode+" "+0+" "+text);
+    applyTextModification();
+}
+
+// Calculates the coordinates for a node anchored text
+function findNodeOrbit(nodeIndex,degree,textElement) {
+    var Tbox = textElement.getBBox();
+	var Twidth = Tbox.width;
+	var Theight = Tbox.height;
+    var radius = nodesList[nodeIndex].r + (Theight/2);
+    if (degree >= 360) {degree = degree % 360;}
+    var deltaX = radius * Math.sin(degree*(Math.PI/180));
+    var deltaY = radius * Math.cos(degree*(Math.PI/180));
+    var alignX = (Twidth/2)*(1 - Math.sin(degree*(Math.PI/180)));
+    var alignY = (Theight/2)*(1 - Math.cos(degree*(Math.PI/180)));
+    var xAnch = nodesList[nodeIndex].posX + deltaX - alignX;
+    var yAnch = nodesList[nodeIndex].posY - deltaY + alignY - 8;
+    return [xAnch, yAnch];
+}
+
+// Reads list 'modifications' and apply all texts to the canvas
+function applyTextModification() {
+	//console.log(modifications);
+    var SVG = document.getElementById('NetworkSVG')
+    for (i=0;i<visableText.length;i++) {
+    	SVG.removeChild(document.getElementById("text"+i));
+    }
+    visableText = [];
+    var index = 0;
+	for (i=0;i<modifications.length;i++) {
+    	var splitted = modifications[i].split(' ');
+        if (splitted[0] == 'Text') {
+        	var textItem = document.createElementNS("http://www.w3.org/2000/svg", 'text');
+            textItem.setAttribute('id',"text"+index);
+            index++;
+            textItem.setAttribute('x',splitted[1]);
+            textItem.setAttribute('y',splitted[2]);
+            textItem.setAttribute('fill',borderColour);
+            textItem.setAttribute('class',"text");
+            textItem.setAttribute('onmousedown',"cursdown(evt)");
+            textItem.setAttribute('style',"user-select: none; cursor: pointer;");
+            //pointer-events: none; 
+            var text = splitted[3];
+            for (j=4;j<splitted.length;j++) {
+            	text += " "+splitted[j];
+            }
+            textItem.innerHTML = text;
+            SVG.appendChild(textItem);
+            visableText.push(i);
+            
+        } else if (splitted[0] == 'TextN') {
+        	if (parseInt(splitted[1]) < numNodes) {
+        		var textItem = document.createElementNS("http://www.w3.org/2000/svg", 'text');
+            	textItem.setAttribute('id',"text"+index);
+            	index++;
+            	textItem.setAttribute('fill',borderColour);
+            	textItem.setAttribute('class',"textN");
+            	textItem.setAttribute('onmousedown',"cursdown(evt)");
+            	textItem.setAttribute('style',"user-select: none; cursor: pointer;");
+            	//pointer-events: none; 
+            	var text = splitted[3];
+            	for (j=4;j<splitted.length;j++) {
+            		text += " "+splitted[j];
+            	}
+            	textItem.innerHTML = text;
+            	SVG.appendChild(textItem);
+            	var coords = findNodeOrbit(parseInt(splitted[1]),parseFloat(splitted[2]),textItem);
+            	textItem.setAttribute('x',coords[0]);
+    			textItem.setAttribute('y',coords[1]);
+            	visableText.push(i);
+            }
+        }
+    }
+}
+
+// 
+function updateMatrix() {
+    var newNumNodes = document.getElementById('NumNodes').value;
+    if (newNumNodes.length < 1) {newNumNodes = '0';}
+    var newNodes = newNumNodes - numNodes;
+    if (newNodes > 0) {
+    	// updateMatrix() - Update Matrix & Node Heading
+        var matrixHeading = document.getElementById('MatrixHeading').innerHTML;
+    	for (i=0;i<newNodes;i++) {
+        	matrixHeading += "<input type='number' class='matrixLableTop' disabled value='"+(parseInt(numNodes)+i)+"' step='1'>";
+        }
+        document.getElementById('MatrixHeading').innerHTML = matrixHeading;
+        document.getElementById('NodeHeading').innerHTML = matrixHeading;
+        
+        // updateMatrix() - Update Activation Nodes
+        var nodeAct = document.getElementById('NodeActivation').innerHTML;
+        var nodeActLabel = document.getElementById('NodeActivationLabel').innerHTML;
+        for (i=0;i<newNodes;i++) {
+            nodeAct += "<input type='number' id='nodeBox"+(parseInt(numNodes)+i)+"' title='Activation applied to Node "+(parseInt(numNodes)+i)+"' class='matrix' style='background-color: "+deadColour+";' min='0' max='1' value='0' step='0.05' oninput='ActivationUpdate()'>";
+            nodeActLabel += "<input type='number' id='nodeBoxLabel"+(parseInt(numNodes)+i)+"' title='Calculated activation of Node "+(parseInt(numNodes)+i)+"' class='matrix' style='background-color: "+deadColour+"; height: 40px; border-radius: 16px;' disabled value='0'>";            
+        }
+        document.getElementById('NodeActivation').innerHTML = nodeAct;
+        document.getElementById('NodeActivationLabel').innerHTML = nodeActLabel;
+        
+        var currentStep = parseInt(document.getElementById("randStep").value);
+        if (currentStep == 0) {currentStep = 20;}
+        
+        // updateMatrix() - Update Existing Matrix Rows
+        for (i=0;i<parseInt(numNodes);i++) {
+        	var rowID = "Row"+i;
+        	var row = document.getElementById(rowID).innerHTML;
+            for (j=0;j<newNodes;j++) {
+            	row += "<input type='number' id='"+i+","+(parseInt(numNodes)+j)+"' title='Weight from Node "+i+" to Node "+(parseInt(numNodes)+j)+"' class='matrix' style='background-color: "+deadColour+";' min='"+document.getElementById("randMin").value+"' max='"+document.getElementById("randMax").value+"' value='0' step='"+(1/currentStep)+"' oninput='WeightUpdate()'>";
+            }
+            document.getElementById(rowID).innerHTML = row;
+        }
+        
+        // updateMatrix() - Add Matrix Rows
+        var matrix = document.getElementById('AdjacencyMatrix').innerHTML;
+        for (i=0;i<newNodes;i++) {
+        	var row = "<div id='Row"+(parseInt(numNodes)+i)+"'><input type='number' class='matrixLable' disabled value='"+(parseInt(numNodes)+i)+"' step='1'>";
+            for (j=0;j<newNumNodes;j++) {
+            	if (j == (parseInt(numNodes)+i)) {
+                	row += "<input type='number' id='"+(parseInt(numNodes)+i)+","+j+"' title='Weight from Node "+(parseInt(numNodes)+i)+" to Node "+j+" (No loops allowed)' class='matrix' style='background-color: "+colourPic(deadColour,backColour,0.4)+"' disabled min='0' max='1' value='0' step='0.05' oninput='WeightUpdate()'>";
+                } else {
+                	row += "<input type='number' id='"+(parseInt(numNodes)+i)+","+j+"' title='Weight from Node "+(parseInt(numNodes)+i)+" to Node "+j+"' class='matrix' style='background-color: "+deadColour+"' min='"+document.getElementById("randMin").value+"' max='"+document.getElementById("randMax").value+"' value='0' step='"+(1/currentStep)+"' oninput='WeightUpdate()'>";
+                }
+            }
+            matrix += row+'</div>';
+        }
+        document.getElementById('AdjacencyMatrix').innerHTML = matrix;
+        
+        // updateMatrix() - Update Matrix Variable
+        var M = [];
+        for (i=0;i<newNumNodes;i++) {
+        	var row = [];
+        	for (j=0;j<newNumNodes;j++) {
+            	if (i<parseInt(numNodes) && j<parseInt(numNodes)) {
+                	row.push(AM[i][j]);
+                } else {
+                	row.push('0');
+                }
+        	}
+            M.push(row);
+            //console.log(...M);
+        }
+        //console.log(...AM);
+        AM = M;
+        //console.log(...AM);
+        numNodes = newNumNodes;
+        fillMatrixValues();
+    }
+    if (newNodes < 0) {
+    	// updateMatrix() - Update Matrix & Node Heading
+        var matrixHeading = document.getElementById('MatrixHeading').innerHTML;
+    	var splitHeading = matrixHeading.split('>',(parseInt(numNodes)+newNodes+1));
+        var newHeading = "";
+        for (i=0;i<splitHeading.length;i++) {
+        	newHeading += splitHeading[i]+'>';
+        }
+        document.getElementById('MatrixHeading').innerHTML = newHeading;
+        document.getElementById('NodeHeading').innerHTML = newHeading
+    	
+        // updateMatrix() - Update Activation Nodes
+        var nodeAct = document.getElementById('NodeActivation').innerHTML;
+        var nodeActLabel = document.getElementById('NodeActivationLabel').innerHTML;
+        var splitNodeAct = nodeAct.split('>',(parseInt(numNodes)+newNodes+1));
+        var splitNodeActLabel = nodeActLabel.split('>',(parseInt(numNodes)+newNodes+1));
+        var newNodeAct = "";
+        var newNodeActLabel = "";
+        for (i=0;i<splitNodeAct.length;i++) {
+        	newNodeAct += splitNodeAct[i]+'>';
+            newNodeActLabel += splitNodeActLabel[i]+'>';
+        }
+        document.getElementById('NodeActivation').innerHTML = newNodeAct;
+        document.getElementById('NodeActivationLabel').innerHTML = newNodeActLabel;
+        
+        // updateMatrix() - Remove Matrix Rows
+        var matrix = document.getElementById('AdjacencyMatrix').innerHTML;
+        var splitMatrix = matrix.split('</div>',(parseInt(numNodes)+newNodes+1));
+        var newMatrix = "";
+        for (i=0;i<splitMatrix.length;i++) {
+        	newMatrix += splitMatrix[i]+'</div>';
+        }
+    	document.getElementById('AdjacencyMatrix').innerHTML = newMatrix;
+        
+        // updateMatrix() - Update Existing Matrix Rows
+        for (i=0;i<newNumNodes;i++) {
+        	var rowID = "Row"+i;
+            var row = document.getElementById(rowID).innerHTML;
+            var splitRow = row.split('>',(parseInt(numNodes)+newNodes+1));
+            var newRow = "";
+            for (j=0;j<splitRow.length;j++) {
+            	newRow += splitRow[j]+'>';
+            }
+            document.getElementById(rowID).innerHTML = newRow;
+        }
+        
+        // updateMatrix() - Update Matrix Variable
+        for (n=0;n<-newNodes;n++) {
+        	AM.pop();
+        }
+        for (i=0;i<AM.length;i++) {
+        	for (n=0;n<-newNodes;n++) {
+            	AM[i].pop();
+            }
+        }
+        numNodes = newNumNodes;
+        fillMatrixValues();
+    }
+    document.getElementById('chooseNode').setAttribute('max',(numNodes-1));
+    document.getElementById('chooseNodeText').setAttribute('max',(numNodes-1));
+    //console.log(...AM);
+}
+
+// Fills the user matrix with previous set values
+function fillMatrixValues() {
+	for (i=0;i<parseInt(numNodes);i++) {
+        for (j=0;j<parseInt(numNodes);j++) {
+        	document.getElementById(""+i+","+j).value = AM[i][j];
+        }
+    }
+    //console.log(AM);
+}
+
+// Updates the adjacency matrix's 'min', 'max' and 'step' values
+function updateMatrixProperties() {
+	for (i=0;i<parseInt(numNodes);i++) {
+        for (j=0;j<parseInt(numNodes);j++) {
+            document.getElementById(""+i+","+j).setAttribute('min',document.getElementById("randMin").value);
+            document.getElementById(""+i+","+j).setAttribute('max',document.getElementById("randMax").value);
+            var currentStep = parseInt(document.getElementById("randStep").value);
+            if (currentStep == 0) {currentStep = 20;}
+            document.getElementById(""+i+","+j).setAttribute('step',1/currentStep);
+        }
+    }
+}
+
+// Updates the adjacency matrix from the user matrix's set values
+function updateMatrixValues() {
+	for (i=0;i<parseInt(numNodes);i++) {
+        for (j=0;j<parseInt(numNodes);j++) {
+            AM[i].splice(j,1,document.getElementById(""+i+","+j).value);
+        }
+    }
+    //console.log(AM);
+    updateRelativeMatrix();
+}
+
+// Updates the relative adjacency matrices
+function updateRelativeMatrix() {
+	var maxList = [];
+    var minList = [];
+	for (i=0;i<parseInt(numNodes);i++) {
+    	maxList.push(Math.max(...AM[i]));
+        minList.push(Math.min(...AM[i]));
+    }
+    var maxV = Math.max(...maxList);
+    var minV = Math.min(...minList);
+    var absMax = Math.max(Math.abs(maxV),Math.abs(minV));
+    var M = [];
+    var N = [];
+    for (i=0;i<parseInt(numNodes);i++) {
+        var rowM = [];
+        var rowN = [];
+        for (j=0;j<parseInt(numNodes);j++) {
+        	rowM.push((AM[i][j]-minV)/(maxV-minV));
+            rowN.push(Math.abs(AM[i][j])/absMax);
+        }
+    	M.push(rowM);
+        N.push(rowN);
+    }
+    RM = M;
+    RzM = N;
+}
+
+// Changes the current arrangement mode
+function arrangement(mode) {
+	console.log(mode);
+	if (mode == 0) {
+    	document.getElementById('mode0').disabled = true;
+        document.getElementById('mode1').disabled = false;
+        document.getElementById('mode2').disabled = false;
+        document.getElementById('mode3').disabled = false;
+        document.getElementById('ANNprop').style.display = 'none';
+        nodeArr = 'circ';
+    } else if (mode == 1) {
+    	document.getElementById('mode0').disabled = false;
+        document.getElementById('mode1').disabled = true;
+        document.getElementById('mode2').disabled = false;
+        document.getElementById('mode3').disabled = false;
+        document.getElementById('ANNprop').style.display = 'none';
+        nodeArr = 'rand';
+        nodesList = [];
+    } else if (mode == 2) {
+    	document.getElementById('mode0').disabled = false;
+        document.getElementById('mode1').disabled = false;
+        document.getElementById('mode2').disabled = true;
+        document.getElementById('mode3').disabled = false;
+        document.getElementById('ANNprop').style.display = 'none';
+        nodeArr = 'lay';
+    } else if (mode == 3) {
+    	document.getElementById('mode0').disabled = false;
+        document.getElementById('mode1').disabled = false;
+        document.getElementById('mode2').disabled = false;
+        document.getElementById('mode3').disabled = true;
+        document.getElementById('ANNprop').style.display = 'block';
+        nodeArr = 'ann';
+        
+    }
+    updateNetworkNodes();
+    updateNetworkArcs();
+    ActivationUpdate();
+}
+
+// Updates the listed nodes and arranges the visula nodes
+function updateNetworkNodes() {
+    if (nodeArr == 'circ') {
+    	nodesList = [];
+    	var r = ringDiameter/2;
+    	if (numNodes == 1) {
+    		nodesList.push(new node(centerX,centerY,nodeRadius,'0'));
+    	} else if (numNodes == 2) {
+    		nodesList.push(new node(centerX-r,centerY,nodeRadius,'0'));
+        	nodesList.push(new node(centerX+r,centerY,nodeRadius,'1'));
+    	} else if (numNodes == 3) {
+    		nodesList.push(new node(centerX,centerY-r,nodeRadius,'0'));
+        	nodesList.push(new node(centerX+(r*Math.sqrt(3)/2),centerY+(ringDiameter/4),nodeRadius,'1'));
+        	nodesList.push(new node(centerX-(r*Math.sqrt(3)/2),centerY+(ringDiameter/4),nodeRadius,'2'));
+    	} else if (numNodes == 4) {
+    		nodesList.push(new node(centerX,centerY-r,nodeRadius,'0'));
+        	nodesList.push(new node(centerX+(r*Math.sqrt(3)/2),centerY+(ringDiameter/4),nodeRadius,'1'));
+        	nodesList.push(new node(centerX-(r*Math.sqrt(3)/2),centerY+(ringDiameter/4),nodeRadius,'2'));
+        	nodesList.push(new node(centerX,centerY,nodeRadius,'3'));
+    	} else {
+    		var angle = 2*Math.PI/numNodes;
+    		for (i=0;i<numNodes;i++) {
+    			nodesList.push(new node(centerX+r*Math.sin(i*angle),centerY-r*Math.cos(i*angle),nodeRadius,""+i));
+    		}
+    	}
+    } else if (nodeArr == 'lay') {
+    	nodesList = [];
+    	if (numNodes == 1) {
+    		nodesList.push(new node(centerX,centerY,nodeRadius,'0'));
+    	} else {
+        	var upperLayer = centerY - layerSpacing/2;
+            var lowerLayer = centerY + layerSpacing/2;
+            var perUpper = Math.ceil(numNodes/2);
+            var perLower = Math.floor(numNodes/2);
+            var upperSpacing = (centerX*2)/(perUpper+3);
+            var lowerSpacing = (centerX*2)/(perLower+3);
+            var space = 2*upperSpacing;
+            for (i=0;i<perUpper;i++) {
+            	nodesList.push(new node(space,upperLayer,nodeRadius,""+i));
+                space += upperSpacing;
+    		}
+            var space = 2*lowerSpacing;
+            for (i=0;i<perLower;i++) {
+            	nodesList.push(new node(space,lowerLayer,nodeRadius,""+(i+perUpper)));
+                space += lowerSpacing;
+    		}
+        }
+    } else if (nodeArr == 'ann') {
+    	nodesList = [];
+        if (numNodes == 1) {
+    		nodesList.push(new node(centerX,centerY,nodeRadius,'0'));
+    	} else if (numNodes == 2) {
+    		nodesList.push(new node(centerX*2/3,centerY,nodeRadius,'0'));
+        	nodesList.push(new node(centerX*4/3,centerY,nodeRadius,'1'));
+    	} else if (numNodes == 3) {
+        	nodesList.push(new node(centerX/2,centerY,nodeRadius,'0'));
+        	nodesList.push(new node(centerX,centerY,nodeRadius,'1'));
+            nodesList.push(new node(centerX*3/2,centerY,nodeRadius,'2'));
+    	} else {
+    		var input = parseInt(document.getElementById('ANNin').value);
+            var hidden = parseInt(document.getElementById('ANNhid').value);
+            var output = parseInt(document.getElementById('ANNout').value);
+            var Ninput = 1;
+            var Nhidden = 2;
+            var Noutput = 1;
+            var picker = 0;
+            for (i=0;i<(numNodes-4);i++) {
+            	if (Ninput == input && Nhidden >= hidden && Noutput == output) {
+                	Nhidden++;
+                    picker = 4;
+                }
+            	if (picker == 0 || picker == 2) {
+                	if (Nhidden == hidden) {
+                    	i--;
+                        picker++;
+                    } else {
+                    	Nhidden++;
+                        picker++;
+                    }
+                } else if (picker == 1) {
+                	if (Ninput == input) {
+                    	i--;
+                        picker = 2;
+                    } else {
+                    	Ninput++;
+                        picker = 2;
+                    }
+                } else if (picker == 3) {
+                	if (Noutput == output) {
+                    	i--;
+                        picker = 0;
+                    } else {
+                    	Noutput++;
+                        picker = 0;
+                    }
+                }
+            }
+            var columns = Math.ceil((numNodes - (Ninput + Noutput))/hidden) + 2;
+            var hiddenRest = Nhidden % hidden;
+            var spaceX = (2*centerX)/(columns + 1);
+            var spaceIn = (2*centerY)/(Ninput + 1);
+            var spaceHid = (2*centerY)/(hidden + 1);
+            var spaceRest = (2*centerY)/(hiddenRest + 1);
+            var spaceOut = (2*centerY)/(Noutput + 1);
+            //console.log("In: "+Ninput+", Hid: "+Nhidden+", Out: "+Noutput+", Column: "+columns);
+            for (i=0;i<numNodes;i++) {
+            	if (i < Ninput) {
+                	nodesList.push(new node(spaceX,spaceIn*(i+1),nodeRadius,""+i));
+                } else if (i < (Ninput + Nhidden)) {
+                	var columnIndex = Math.floor((i-Ninput)/hidden);
+                    if (columnIndex == (columns-3) && hiddenRest != 0) {
+                        nodesList.push(new node(spaceX*(columnIndex+2),spaceRest*(((i-Ninput)%hidden)+1),nodeRadius,""+i));
+                    } else {
+                        nodesList.push(new node(spaceX*(columnIndex+2),spaceHid*(((i-Ninput)%hidden)+1),nodeRadius,""+i));
+                    }
+                } else {
+                	nodesList.push(new node(2*centerX-spaceX,spaceOut*(i-(Ninput+Nhidden)+1),nodeRadius,""+i));
+                }
+    		}
+            ANNlisting = [];
+            ANNlisting.push(Ninput);
+            for (i=0;i<Math.floor(Nhidden/hidden);i++) {
+            	ANNlisting.push(hidden);
+            }
+            if (hiddenRest != 0) {
+            	ANNlisting.push(hiddenRest);
+            }
+            ANNlisting.push(Noutput);
+            console.log(ANNlisting);
+    	}
+    } else if (nodeArr == 'rand') {
+    	var startLength = nodesList.length;
+        var newNodes = parseInt(numNodes) - startLength;
+        if (newNodes > 0) {
+        	for (i=0;i<newNodes;i++) {
+        		var randX;
+            	var randY;
+            	var occupied = true;
+            	while (occupied) {
+            		randX = randomPadding+Math.random()*2*(centerX-randomPadding);
+        			randY = randomPadding+Math.random()*2*(centerY-randomPadding);
+                	occupied = false;
+                	for (j=0;j<nodesList.length;j++) {
+                		if (Math.sqrt(Math.pow(nodesList[j].posX-randX,2)+Math.pow(nodesList[j].posY-randY,2)) < (2*nodeRadius+5)) {
+                    		occupied = true;
+                    	}
+                	}
+            	}
+        		nodesList.push(new node(randX,randY,nodeRadius,""+(i+startLength)));
+        	}
+        } else if (newNodes < 0) {
+        	for (i=0;i<(-newNodes);i++) {
+            	nodesList.pop();
+            }
+        }
+    }
+    applyColourModification();
+    drawNodes();
+    applyTextModification();
+}
+
+// Draws the visual nodes according to the listed nodes
+function drawNodes() {
+	var SVG = document.getElementById('NetworkSVG')
+    for (i=0;i<visableNodes;i++) {
+    	SVG.removeChild(document.getElementById("node"+i));
+    }
+	for (i=0;i<nodesList.length;i++) {
+    	var node = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+        node.setAttribute('id',"node"+nodesList[i].name);
+        //node.setAttribute('title',"Node "+nodesList[i].name);
+        node.setAttribute('r',""+nodesList[i].r);
+        node.setAttribute('cx',""+nodesList[i].posX);
+        node.setAttribute('cy',""+nodesList[i].posY);
+        node.setAttribute('class',"node");
+        node.setAttribute('onmousedown',"cursdown(evt)");
+        if (nodesList[i].colour == 'standard') {
+        	var setColour = deadColour;
+        } else {
+        	var setColour = nodesList[i].colour;
+        }
+        node.setAttribute('style',"fill: "+setColour+"; stroke: "+borderColour+"; cursor: pointer;");
+        SVG.appendChild(node);
+        document.getElementById("node"+nodesList[i].name).innerHTML = "<title>Node "+nodesList[i].name+"</title>";
+    }
+    visableNodes = nodesList.length;
+    //console.log(nodesList.length);
+}
+
+// Arranges the visual arcs
+function updateNetworkArcs() {
+	var SVG = document.getElementById('NetworkSVG');
+    var textSVG = document.getElementById('SVGtext');
+    for (i=0;i<visableArcs.length;i++) {
+    	SVG.removeChild(document.getElementById(visableArcs[i]));
+    }
+    for (i=0;i<visableArrowHeads.length;i++) {
+    	textSVG.removeChild(document.getElementById(visableArrowHeads[i]));
+    }
+    visableArcs = [];
+    visableArrowHeads = [];
+    for (i=0;i<parseInt(numNodes);i++) {
+    	for (j=0;j<parseInt(numNodes);j++) {
+        	if (AM[i][j] != 0) {
+            	var arc = document.createElementNS("http://www.w3.org/2000/svg", 'path');
+                arc.setAttribute('id',"arc"+i+","+j);
+                var dx = nodesList[j].posX-nodesList[i].posX;
+                var dy = nodesList[j].posY-nodesList[i].posY;
+            	if (AM[j][i] != 0) {
+                    var theta = Math.atan2(dy,dx);
+                    var bcx1 = curvature*Math.cos(theta+(Math.PI/4));
+                    var bcy1 = curvature*Math.sin(theta+(Math.PI/4));
+                    var bcx2 = curvature*Math.cos(theta+(3*Math.PI/4));
+                    var bcy2 = curvature*Math.sin(theta+(3*Math.PI/4));
+                    arc.setAttribute('d',"M "+nodesList[i].posX+" "+nodesList[i].posY+" c "+bcx1+" "+bcy1+", "+(dx+bcx2)+" "+(dy+bcy2)+", "+dx+" "+dy);
+                } else {
+                	arc.setAttribute('d',"M "+nodesList[i].posX+" "+nodesList[i].posY+" L "+nodesList[j].posX+" "+nodesList[j].posY);
+                }
+                var backFade = colourPic(backColour,borderColour,0.04);
+                var colour = colourPic(backFade,borderColour,RzM[i][j]);
+                arc.setAttribute('style',"fill: none; stroke: "+colour+"; opacity: 1;");
+                arc.setAttribute('class',"arc");
+                SVG.appendChild(arc);
+                visableArcs.push("arc"+i+","+j);
+                document.getElementById("arc"+i+","+j).innerHTML = "<title>Relation of value "+(Math.round(AM[i][j]*100)/100)+" from Node "+i+" to Node "+j+"</title>";
+                var arrow = document.createElementNS("http://www.w3.org/2000/svg", 'textPath');
+                arrow.setAttribute('id',"arr"+i+","+j);
+                arrow.setAttribute('href',"#arc"+i+","+j);
+                var fontSize = 30-parseInt(numNodes);
+                var offset = Math.sqrt(Math.pow(dx,2)+Math.pow(dy,2))-(nodeRadius+25-parseInt(numNodes));
+                if (fontSize < 10) {
+                	fontSize = 10;
+                    offset = Math.sqrt(Math.pow(dx,2)+Math.pow(dy,2))-(nodeRadius+5);
+                }
+                arrow.setAttribute('startOffset',""+offset+"px");
+                arrow.setAttribute('style',"fill: "+colour+"; opacity: 1; font-size: "+fontSize+"px; dominant-baseline: central; pointer-events: none; user-select: none;");
+                arrow.innerHTML = "➤";
+                textSVG.appendChild(arrow);
+                visableArrowHeads.push("arr"+i+","+j);
+            }
+        }
+    }
+    drawNodes();
+}
+
+// Performs Sellberg's operator to calculate the spread of activation in the network
+function SellbergOperator() {
+    var dotMatrix = Array(AM.length+1).fill().map(()=>Array(AM.length+1).fill(0));
+    dotMatrix[0][0] = 1;
+    for (i=0;i<AM.length;i++) {
+    	for (j=0;j<AM.length;j++) {
+        	dotMatrix[i+1][j+1] = parseFloat(AM[i][j]);
+        }
+    }
+    for (i=0;i<nodesList.length;i++) {
+    	dotMatrix[i+1][0] = parseFloat(document.getElementById("nodeBox"+i).value);
+    }
+    //console.log(dotMatrix);
+    
+    
+    
+    
+	var addedActivations = [];
+    for (i=0;i<nodesList.length;i++) {
+    	addedActivations.push(0);
+    }
+    for (i=0;i<nodesList.length;i++) {
+    	for (j=0;j<nodesList.length;j++) {
+        	addedActivations[j] += AM[i][j]*nodesList[i].activation;
+        }
+    }
+    for (i=0;i<nodesList.length;i++) {
+    	nodesList[i].activation += addedActivations[i];
+    	document.getElementById("nodeBoxLabel"+i).value = ""+nodesList[i].activation;
+    }
+}
+
+// Reads user set activation
+function updateActivation() {
+	for (i=0;i<nodesList.length;i++) { // Iterates over all nodes
+    	nodesList[i].activation = parseFloat(document.getElementById("nodeBox"+i).value); // Sets each node's activation to the value of respective "activation set box"
+        document.getElementById("nodeBoxLabel"+i).value = ""+nodesList[i].activation; // Sets the value of each node's "activation display box" to its acivation
+    }
+}
+
+// Iterates each nodes and compares its value with the supposed value from adjacent nodes
+function activationEquilibriumError() {
+	var errors = [];
+    var nodeErrors = "Error of individual nodes: ";
+	for (i=0;i<nodesList.length;i++) {
+    	var act = nodesList[i].activation;
+        var actSum = parseFloat(document.getElementById("nodeBox"+i).value);
+        for (j=0;j<nodesList.length;j++) {
+        	actSum += AM[j][i] * nodesList[j].activation;
+        }
+        //console.log(act,actSum)
+        errors.push(Math.pow(actSum - act,2)); // Shows sign off how the assigned activation should be changed in order to match surrounding environment
+        nodeErrors += "Node "+i+" = "+(Math.round((actSum - act)*10000)/10000)+", ";
+    }
+    var averageError = errors.reduce((a, b) => a + b, 0)/nodesList.length;
+    document.getElementById("info").innerHTML = "Network activation mean square error:   "+averageError;
+    document.getElementById("info").setAttribute('title',nodeErrors);
+}
+
+// Resets all the node activations
+function activationReset() {
+	for (i=0;i<nodesList.length;i++) {
+    	nodesList[i].activation = 0;
+        document.getElementById("nodeBox"+i).value = "0";
+        document.getElementById("nodeBoxLabel"+i).value = "0";
+    }
+}
+
+// Creates a normalised list of all nodes' activation
+function relativeActivation() {
+	var activationList = [];
+	for (i=0;i<nodesList.length;i++) {
+    	activationList.push(nodesList[i].activation);
+    }
+    var maxA = Math.max(...activationList);
+    if (maxA > 1) {
+    	for (i=0;i<nodesList.length;i++) {
+    		activationList[i] = activationList[i]/maxA;
+    	}
+    }
+    return activationList;
+}
+
+// Finds the automatic negative activation colour and applies it
+function autoNegColour() {
+	var negCol = colourComplement(deadColour,activeColour);
+    document.getElementById("negCol").value = negCol;
+}
+
+// Colour nodes and their connected arcs according to their activation
+function colourNodes() {
+	var backFade = colourPic(backColour,borderColour,0.04);
+    var relActiv = relativeActivation();
+    for (i=0;i<nodesList.length;i++) {
+    	// Applies colour to nodes and respective node boxes
+    	var activ = nodesList[i].activation;
+        if (nodesList[i].colour == 'standard') {
+        	var setColour = deadColour;
+        } else {
+        	var setColour = nodesList[i].colour;
+        }
+        var setNodeColour;
+        if (activ > 0) {setNodeColour = colourPic(setColour,activeColour,relActiv[i]);}
+        else {setNodeColour = colourPic(setColour,negativeColour,relActiv[i]);}
+        document.getElementById("nodeBox"+i).style.backgroundColor = setNodeColour;
+        document.getElementById("nodeBoxLabel"+i).style.backgroundColor = setNodeColour;
+        document.getElementById("node"+i).style.fill = setNodeColour;
+        // Applies the appropriate label to the node
+        if (activ != 0) {
+        	document.getElementById("node"+i).innerHTML = "<title>Node "+i+" (Activation "+(Math.round(activ*100)/100)+")</title>";
+        } else {
+        	document.getElementById("node"+i).innerHTML = "<title>Node "+i+"</title>";
+        }
+        for (j=0;j<nodesList.length;j++) {
+        	// Applies colour to arcs and respective matrix cells
+        	if (AM[i][j] != 0) {
+            	var AorNColour;
+                if (activ*AM[i][j] > 0) {AorNColour = activeColour;} else {AorNColour = negativeColour;}
+                var setArcBoxColour = colourPic(deadColour,AorNColour,RzM[i][j]*relActiv[i]);
+                document.getElementById(""+i+","+j).style.backgroundColor = setArcBoxColour;
+                var origColour = colourPic(backFade,borderColour,RzM[i][j]);
+            	var fullActivColour = colourPic(backFade,AorNColour,RzM[i][j]);
+            	var setArcColour = colourPic(origColour,fullActivColour,activ);
+                document.getElementById("arc"+i+","+j).style.stroke = setArcColour;
+            	document.getElementById("arr"+i+","+j).style.fill = setArcColour;
+                // Applies the appropriate label to the arc
+                if (activ != 0) {
+        			document.getElementById("arc"+i+","+j).innerHTML = "<title>Relation of value "+(Math.round(AM[i][j]*100)/100)+" from Node "+i+" to Node "+j+" (Transmitting "+(Math.round((activ*AM[i][j])*100)/100)+" Activation)</title>";
+        		} else {
+                	document.getElementById("arc"+i+","+j).innerHTML = "<title>Relation of value "+(Math.round(AM[i][j]*100)/100)+" from Node "+i+" to Node "+j+"</title>";
+                }
+            }
+        }
+    }
+}
+
+// Resets all activation colour in the user interface
+function colourReset() {
+	for (i=0;i<nodesList.length;i++) {
+        document.getElementById("nodeBox"+i).style.backgroundColor = deadColour;
+        document.getElementById("nodeBoxLabel"+i).style.backgroundColor = deadColour;
+        for (j=0;j<nodesList.length;j++) {
+        	if (AM[i][j] != 0) {
+                document.getElementById(""+i+","+j).style.backgroundColor = deadColour;
+            }
+        }
+    }
+}
+
+// Reads list 'modifications' and apply all colour changes to nodes
+function applyColourModification() {
+	for (i=0;i<modifications.length;i++) {
+    	var splitted = modifications[i].split(' ');
+        if (splitted[0] == 'Colour') {
+        	if (parseInt(splitted[1]) < numNodes) {
+            	nodesList[splitted[1]].colour = splitted[2];
+            }
+        }
+    }
+}
+
+// Randomises the adjacency matrix and updates the user matrix and SVG
+function randomise() {
+	activationReset();
+    colourReset();
+	var rmax = parseFloat(document.getElementById('randMax').value);
+    var rmin = parseFloat(document.getElementById('randMin').value);
+    var step = parseFloat(document.getElementById('randStep').value);
+    if (rmax < rmin) {
+    	window.alert("Minimum value cannot be larger than maximum value");
+        return;
+    }
+    var pa = parseFloat(document.getElementById('randPArc').value);
+    var pda = parseFloat(document.getElementById('randPDArc').value);
+    var M = [];
+    for (i=0;i<parseInt(numNodes);i++) {
+        var row = [];
+        for (j=0;j<parseInt(numNodes);j++) {
+        	if (i == j) {
+            	row.push('0');
+            } else if (Math.random() < pa) {
+            	if (step == 0) {
+                	row.push(Math.random()*(rmax-rmin)+rmin);
+                } else {
+                	row.push(Math.ceil((Math.random()*(rmax-rmin)+rmin)*step)/step);
+                }
+            } else {
+            	row.push('0');
+            }
+        }
+    	M.push(row);
+    }
+    for (i=0;i<parseInt(numNodes);i++) {
+        for (j=0;j<parseInt(numNodes);j++) {
+            if (M[i][j] != 0 && M[j][i] != 0) {
+            	if (Math.random() >= pda) {
+                	if (Math.random() >= 0.5) {
+                    	M[i][j] = 0;
+                    } else {
+                    	M[j][i] = 0;
+                    }
+                }
+            }
+            if (nodeArr == 'lay') {
+            	if ((i < numNodes/2) && (j < numNodes/2)){
+                	M[i][j] = 0;
+                } else if ((i >= numNodes/2) && (j >= numNodes/2)) {
+                	M[i][j] = 0;
+                }
+            } else if (nodeArr == 'ann') {
+            	var groupIndexI = 0;
+                var redI = i;
+                while (redI >= 0) {
+                	redI -= ANNlisting[groupIndexI];
+                    groupIndexI++;
+                }
+                var groupIndexJ = 0;
+                var redJ = j;
+                while (redJ >= 0) {
+                	redJ -= ANNlisting[groupIndexJ];
+                    groupIndexJ++;
+                }
+                if (groupIndexI == groupIndexJ || (groupIndexI != (groupIndexJ+1) && groupIndexI != (groupIndexJ-1))) {
+                	M[i][j] = 0;
+                }
+            }
+        }
+    }
+    AM = M;
+    fillMatrixValues();
+    updateRelativeMatrix();
+    updateNetworkArcs();
+    colourNodes();
+}
+
+// Produces a hex value for a colour as a blend between two other colours
+function colourPic(preColour,postColour,blend) {
+	if (blend < 0) { blend = Math.abs(blend);}
+    if (blend > 1) { blend = 1;}
+	var preR = parseInt(preColour.slice(1,3),16);
+    var preG = parseInt(preColour.slice(3,5),16);
+    var preB = parseInt(preColour.slice(5,7),16);
+    var postR = parseInt(postColour.slice(1,3),16);
+    var postG = parseInt(postColour.slice(3,5),16);
+    var postB = parseInt(postColour.slice(5,7),16);
+	var hexR = Math.floor(blend*(postR-preR)+preR).toString(16);
+    var hexG = Math.floor(blend*(postG-preG)+preG).toString(16);
+    var hexB = Math.floor(blend*(postB-preB)+preB).toString(16);
+    if (hexR.length == 1) { hexR = "0"+hexR;}
+    if (hexG.length == 1) { hexG = "0"+hexG;}
+    if (hexB.length == 1) { hexB = "0"+hexB;}
+    return "#"+hexR+hexG+hexB;
+}
+
+// Produces a hex value for a colour of the best match possible to a complement of a feature colour relative to a base colour
+function colourComplement(baseCol,featCol) {
+	var baseR = parseInt(baseCol.slice(1,3),16);
+    var baseG = parseInt(baseCol.slice(3,5),16);
+    var baseB = parseInt(baseCol.slice(5,7),16);
+    var featR = parseInt(featCol.slice(1,3),16);
+    var featG = parseInt(featCol.slice(3,5),16);
+    var featB = parseInt(featCol.slice(5,7),16);
+    var hexR = Math.floor(2*baseR-featR).toString(16);
+    var hexG = Math.floor(2*baseG-featG).toString(16);
+    var hexB = Math.floor(2*baseB-featB).toString(16);
+    if (hexR.length == 1) { hexR = "0"+hexR;}
+    if (hexG.length == 1) { hexG = "0"+hexG;}
+    if (hexB.length == 1) { hexB = "0"+hexB;}
+    if (hexR.length >= 3) { hexR = "ff";}
+    if (hexG.length >= 3) { hexG = "ff";}
+    if (hexB.length >= 3) { hexB = "ff";}
+    return "#"+hexR+hexG+hexB;
+}
+
+// Identifies cursor event position
+function cursdown(evt) {
+	if (evt.target.classList.contains('node')) {
+		var nodeID = parseInt(evt.target.getAttributeNS(null,'id').replace("node","")); // Gets ID of node
+		//console.log(nodeID);
+        var compX = evt.clientX - nodesList[nodeID].posX;
+        var compY = evt.clientY - nodesList[nodeID].posY;
+        const startX = nodesList[nodeID].posX;
+        const startY = nodesList[nodeID].posY;
+        cursmove(evt,startX,startY,compX,compY,nodeID,true,'node');
+        
+	} else if (evt.target.classList.contains('text')) {
+    	var textID = parseInt(evt.target.getAttributeNS(null,'id').replace("text","")); // Gets ID of text
+    	var compX = evt.clientX - modifications[visableText[textID]].split(' ')[1];
+        var compY = evt.clientY - modifications[visableText[textID]].split(' ')[2];
+        const startX = modifications[visableText[textID]].split(' ')[1];
+        const startY = modifications[visableText[textID]].split(' ')[2];
+        $('body').keydown(function (event) { // Delete button
+        	  if (event.keyCode == 46) {
+              	stop(evt,textID,'text');
+                modifications.splice(visableText[textID],1);
+                applyTextModification();
+            }
+        });
+        cursmove(evt,startX,startY,compX,compY,textID,false,'text');
+        
+    } else if (evt.target.classList.contains('textN')) {
+    	var textID = parseInt(evt.target.getAttributeNS(null,'id').replace("text",""));
+        var anchorNode = modifications[visableText[textID]].split(' ')[1];
+        var degree = modifications[visableText[textID]].split(' ')[2];
+        var coords = findNodeOrbit(anchorNode,degree,document.getElementById("text"+textID));
+        var compX = evt.clientX - document.getElementById('background').getBoundingClientRect().x - nodesList[anchorNode].posX; // Clicking distance away from node center
+        var compY = evt.clientY - document.getElementById('background').getBoundingClientRect().y - nodesList[anchorNode].posY;
+        const startX = compX;
+        const startY = compY;
+        //console.log("Degree: "+degree+", Coordinates: ("+coords[0]+","+coords[1]+"), compX: "+compX+", compY: "+compY+", startX: "+startX+", startY: "+startY+", evt.clientX: "+evt.clientX+", evt.clientY: "+evt.clientY);
+        $('body').keydown(function (event) { // Delete button
+        	  if (event.keyCode == 46) {
+              	stop(evt,textID,'text');
+                modifications.splice(visableText[textID],1);
+                applyTextModification();
+            }
+        });
+        cursmove(evt,startX,startY,compX,compY,textID,false,'textN');
+    }
+}
+
+// Determines cursor movement
+function cursmove(evt,startX,startY,compX,compY,id,first,type) {
+	if (type == 'node') {
+    	if (first == false) {
+        	if (nodeArr != 'rand') {
+            	document.getElementById('mode0').disabled = false;
+    			document.getElementById('mode1').disabled = true;
+    			document.getElementById('mode2').disabled = false;
+    			document.getElementById('mode3').disabled = false;
+    			document.getElementById('ANNprop').style.display = 'none';
+    			nodeArr = 'rand';
+            }
+            if (evt.shiftKey) {
+        		if (Math.abs((evt.clientX - compX) - startX) > Math.abs((evt.clientY - compY) - startY)) {
+            		//console.log("X < Y");
+            		nodesList[id].posX = evt.clientX - compX;
+    				nodesList[id].posY = startY;
+            	} else {
+            		//console.log("Y < X");
+            		nodesList[id].posX = startX;
+    				nodesList[id].posY = evt.clientY - compY;
+            	}
+        	} else {
+        		nodesList[id].posX = evt.clientX - compX;
+    			nodesList[id].posY = evt.clientY - compY;
+        	}
+    	}
+        updateNetworkArcs();
+        updateActivation();
+        SellbergOperator();
+    	colourNodes();
+        applyTextModification();
+    	document.getElementById("node"+id).setAttributeNS(null,'onmousemove',"cursmove(evt,"+startX+","+startY+","+compX+","+compY+","+id+",false,'node')");
+    	document.getElementById('NetworkSVG').setAttributeNS(null,'onmousemove',"cursmove(evt,"+startX+","+startY+","+compX+","+compY+","+id+",false,'node')");
+    	document.getElementById("node"+id).setAttributeNS(null,'onmouseup',"stop(evt,"+id+",'node')");
+    	document.getElementById('NetworkSVG').setAttributeNS(null,'onmouseup',"stop(evt,"+id+",'node')");
+    	
+    } else if (type == 'text') {
+    	var mod = modifications[visableText[id]].split(' ');
+        if (evt.shiftKey) {
+        	if (Math.abs((evt.clientX - compX) - startX) > Math.abs((evt.clientY - compY) - startY)) {
+            	//console.log("X < Y");
+            	mod[1] = evt.clientX - compX;
+    			mod[2] = startY;
+            } else {
+            	//console.log("Y < X");
+            	mod[1] = startX;
+    			mod[2] = evt.clientY - compY;
+            }
+        } else {
+        	mod[1] = evt.clientX - compX;
+    		mod[2] = evt.clientY - compY;
+        }
+        var newMod = "Text";
+        for (i=1;i<mod.length;i++) {
+        	newMod += " "+mod[i];
+        }
+        modifications[visableText[id]] = newMod;
+        document.getElementById("text"+id).setAttribute('x',mod[1]);
+        document.getElementById("text"+id).setAttribute('y',mod[2]);
+        document.getElementById("text"+id).setAttributeNS(null,'onmousemove',"cursmove(evt,"+startX+","+startY+","+compX+","+compY+","+id+",false,'text')");
+    	document.getElementById('NetworkSVG').setAttributeNS(null,'onmousemove',"cursmove(evt,"+startX+","+startY+","+compX+","+compY+","+id+",false,'text')");
+    	document.getElementById('NetworkSVG').setAttributeNS(null,'onmouseup',"stop(evt,"+id+",'text')");
+        
+    } else if (type == 'textN') {
+    	var mod = modifications[visableText[id]].split(' ');
+        var anchorNode = parseInt(mod[1]);
+        var degree = parseFloat(mod[2]);
+        var newCompX = evt.clientX - document.getElementById('background').getBoundingClientRect().x - nodesList[anchorNode].posX; // Clicking distance away from node center
+        var newCompY = evt.clientY - document.getElementById('background').getBoundingClientRect().y - nodesList[anchorNode].posY;
+        var theta = Math.atan2(compY,compX) - Math.atan2(newCompY,newCompX);
+        mod[2] = degree - theta*(180/Math.PI);
+        var coords;
+        var snap;
+        if (evt.shiftKey) {
+            coords = findNodeOrbit(anchorNode,mod[2] - (mod[2] % 15),document.getElementById("text"+id));
+            snap = true;
+        } else {
+        	coords = findNodeOrbit(anchorNode,mod[2],document.getElementById("text"+id));
+            snap = false;
+        }
+        var newMod = "TextN";
+        for (i=1;i<mod.length;i++) {
+        	newMod += " "+mod[i];
+        }
+        modifications[visableText[id]] = newMod;
+        document.getElementById("text"+id).setAttribute('x',coords[0]);
+        document.getElementById("text"+id).setAttribute('y',coords[1]);
+        document.getElementById("text"+id).setAttributeNS(null,'onmousemove',"cursmove(evt,"+startX+","+startY+","+newCompX+","+newCompY+","+id+",false,'textN')");
+    	document.getElementById('NetworkSVG').setAttributeNS(null,'onmousemove',"cursmove(evt,"+startX+","+startY+","+newCompX+","+newCompY+","+id+",false,'textN')");
+    	document.getElementById('NetworkSVG').setAttributeNS(null,'onmouseup',"saveSnappedDegree("+id+","+snap+");stop(evt,"+id+",'text')");
+    }
+}
+
+// Sets last cursor position
+function stop(evt,id,type) {
+    document.getElementById(type+id).removeAttributeNS(null,'onmousemove');
+    document.getElementById(type+id).removeAttributeNS(null,'onmouseup');
+    document.getElementById('NetworkSVG').removeAttributeNS(null,'onmousemove');
+    document.getElementById('NetworkSVG').removeAttributeNS(null,'onmouseup');
+    if (type == 'text') {
+    	$('body').off('keydown');
+    } 
+}
+
+function saveSnappedDegree(id,snap) {
+	if (snap) {
+    	var mod = modifications[visableText[id]].split(' ');
+        mod[2] = mod[2] - (mod[2] % 15);
+        var newMod = "TextN";
+        for (i=1;i<mod.length;i++) {
+        	newMod += " "+mod[i];
+        }
+        modifications[visableText[id]] = newMod;
+    }
+}
+
+// Loads a file from the computer and saves it as the variable 'netFile'
+function load(file) {
+	try {
+        var name = file.name;
+        var extension = name.split('.');
+        extension = extension[extension.length -1];
+        if (extension == 'actNet') {
+        	netFile = file;
+        	document.getElementById('fileInfo').innerHTML = name;
+        } else {
+        	document.getElementById('fileInfo').innerHTML = "Invalid file format (."+extension+")";
+            window.alert("Only ActNet files supported. Please choose a supported file format (.actNet).");
+        }
+    } catch {
+    	document.getElementById('fileInfo').innerHTML = "Couldn't read file...";
+    }
+}
+
+// Unpacks the data from the file stored as the variable 'netFile'
+function upload() {
+	try {
+    	const reader = new FileReader();
+		var data;
+		reader.readAsText(netFile);
+		reader.onloadend = function() {
+			data = reader.result;
+            data = data.split(/\n/);
+        	//console.log(data);
+            retrieveInformation(data);
+            console.log('UPLOAD SUCCESSFUL');
+		}
+    } catch {
+    	return;
+    }
+}
+
+// Uses unpacked data to reinitiate all variables in the program
+function retrieveInformation(dataList) {
+	// Resets all activation
+    activationReset();
+    colourReset();
+    
+    // Set mode as random
+	document.getElementById('mode0').disabled = false;
+    document.getElementById('mode1').disabled = true;
+    document.getElementById('mode2').disabled = false;
+    document.getElementById('mode3').disabled = false;
+    document.getElementById('ANNprop').style.display = 'none';
+    nodeArr = 'rand';
+    
+    // Update colour plaette
+	var colours = dataList[1].split(':');
+    backColour = colours[0];
+    deadColour = colours[1];
+    borderColour = colours[2];
+    activeColour = colours[3];
+    negativeColour = colours[4];
+    if (negativeColour == null) {negativeColour = colourComplement(deadColour,activeColour)}
+    
+    document.getElementById('backCol').value = backColour;
+    document.getElementById('deadCol').value = deadColour;
+    document.getElementById('bordCol').value = borderColour;
+    document.getElementById('actCol').value = activeColour;
+    document.getElementById('negCol').value = negativeColour;
+    
+    // Update the number of nodes and user matrix
+    document.getElementById('NumNodes').value = parseInt(dataList[2]);
+    updateMatrix();
+    AM = JSON.parse(dataList[4]);
+    RM = JSON.parse(dataList[5]);
+    RzM = JSON.parse(dataList[6]);
+    fillMatrixValues();
+    
+    // Creates nodes and arcs on the canvas
+    nodesList = JSON.parse(dataList[3]);
+    updateNetworkArcs();
+    
+    // Applies modification texts
+    modifications = JSON.parse(dataList[7]);
+    applyTextModification();
+    
+    // Sets the appropriate activation
+    try {
+    	var currentAct = JSON.parse(dataList[8]);
+    	for (i=0;i<nodesList.length;i++) {
+    		document.getElementById("nodeBox"+i).value = ""+currentAct[i];
+    	}
+    	ActivationUpdate();
+    } catch(error) {
+    	for (i=0;i<nodesList.length;i++) {
+    		document.getElementById("nodeBox"+i).value = ""+nodesList[i].activation;
+        	document.getElementById("nodeBoxLabel"+i).value = ""+nodesList[i].activation;
+    	}
+    }
+    
+    // Colours all accordingly
+    newColours();
+}
+
+// Saves all essential variables and saves it to a downloadable file
+function save() {
+	var data = 'Activation Network Data - By Samuel Sellberg \n';
+    data += backColour+':'+deadColour+':'+borderColour+':'+activeColour+':'+negativeColour+'\n';
+    data += numNodes + '\n';
+    data += JSON.stringify(nodesList) + '\n';
+    data += JSON.stringify(AM) + '\n';
+    data += JSON.stringify(RM) + '\n';
+    data += JSON.stringify(RzM) + '\n';
+    data += JSON.stringify(modifications) + '\n';
+    
+    // Reads current set activation
+    var currentAct = []
+    for (i=0;i<nodesList.length;i++) { // Iterates over all nodes
+    	currentAct.push(parseFloat(document.getElementById("nodeBox"+i).value));
+    }
+    data += JSON.stringify(currentAct);
+    
+    var newFile = new Blob([data],{type: "text/plain;charset=utf-8"});
+    newFile.type = 'data/activation_network';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(newFile);
+    a.download = 'network.actNet';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    
+	console.log('SAVE SUCCESSFUL');
+}
+
+// Functions that automatically loads when the page has fully loaded
+window.addEventListener('load', function () {
+	document.getElementById('background').setAttribute('fill',backColour);
+    
+    const fileSelector = document.getElementById('fileSelect');
+	fileSelector.addEventListener('change', (event) => {
+		load(event.target.files[0]);
+	});
+    
+    const dropArea = document.getElementById('background');
+	dropArea.addEventListener('dragover', (event) => {
+		event.stopPropagation();
+		event.preventDefault();
+		// Style the drag-and-drop as a "copy file" operation.
+        var SVG = document.getElementById('NetworkSVG');
+        const dropZone = document.createElementNS("http://www.w3.org/2000/svg", 'path');
+        dropZone.setAttribute('d',"M 1 1 H "+(centerX*2)+" V "+(centerY*2)+" H 1 Z");
+        dropZone.setAttribute('id',"dropZone");
+        dropZone.setAttribute('fill','#FFFFFF');
+        dropZone.setAttribute('opacity','0');
+        SVG.appendChild(dropZone);
+        dropZone.addEventListener('dragover', (event) => {
+        	event.stopPropagation();
+			event.preventDefault();
+        	dropArea.setAttribute('fill',colourPic(backColour,'#70FFB8',0.2));
+            event.dataTransfer.dropEffect = 'copy';
+            dropZone.addEventListener('dragleave', (event) => {
+        		dropArea.setAttribute('fill',backColour);
+                try {
+                	SVG.removeChild(dropZone);
+                } catch {
+                	return;
+                }
+        	});
+        });
+        dropZone.addEventListener('drop', (event) => {
+			event.stopPropagation();
+			event.preventDefault();
+            dropArea.setAttribute('fill',backColour);
+            try {
+                SVG.removeChild(dropZone);
+            } catch {
+                return;
+            }
+            load(event.dataTransfer.files[0]);
+            upload();
+		});
+	});
+    
+	NodesUpdate();
+    }) 
+
+//document.getElementById('err').innerHTML = 'information';
+
+</script>
+
+<html>
+<head>
+
+<script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+<!--<script type="text/javascript" src="https://cdnjs.com/libraries/mathjs"></script>-->
+<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.2.1/math.js" integrity="sha512-47N5yVdAeXJ+9qstVMTH2Z0EpX618sjYZcswRwhpldSTD0IbW6yQPtzg4RLrPp/2+TIgEF1elT68/ZBu82nqJA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>-->
+<!--<script type="text/javascript" src="/dist/v0.8/Cindy.js"></script>-->
+<script type="text/javascript"  src="https://cindyjs.org/dist/v0.8.1/Cindy.js"></script>
+<!--<script type="text/javascript" language="JavaScript" src="https://www.arndt-bruenner.de/mathe/scripts/eigenwertkx.js"></script>-->
+<!--<script>var exports = {};</script>-->
+<!--<script type="text/javascript"  src="https://cdn.jsdelivr.net/npm/ml-matrix@6.10.2/package.json"></script>-->
+<!--<script type="text/ES6"  src="https://cdn.jsdelivr.net/npm/ml-matrix@6.10.2/matrix.js"></script>-->
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.node {
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.node:hover {
+  stroke-width: 2;
+  opacity: 0.8;
+}
+
+.arc {
+  stroke-width: 1;
+}
+
+.arc:hover {
+  stroke-width: 2;
+}
+
+.text {
+  text-align: right;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 25px;
+}
+
+.text:hover {
+  opacity: 0.8;
+}
+
+.textN {
+  text-align: right;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 25px;
+}
+
+.textN:hover {
+  opacity: 0.8;
+}
+
+.button {
+  background-color: #4CAF50;
+  border: none;
+  color: white;
+  padding: 3px 4px;
+  text-align: center;
+  font-size: 18px;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.button:hover {
+  opacity: 1;
+}
+
+.button:disabled {
+  opacity: 0.4;
+}
+
+.matrix {
+  border-radius: 20%;
+  border: 2px solid white;
+  color: white;
+  width: 80px;
+  height: 80px;
+  padding: 3px 3px;
+  text-align: center;
+  font-size: 20px;
+  opacity: 1;
+  cursor: pointer;
+}
+
+.matrix:hover {
+  border: 3px solid white;
+  opacity: 0.95;
+}
+
+.matrix:focus {
+  border: 4px solid white;
+  outline: none;
+  opacity: 0.95;
+}
+
+.matrixLable {
+  background: none;
+  border: none;
+  color: black;
+  width: 60px;
+  height: 25px;
+  text-align: right;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 25px;
+  opacity: 1;
+}
+
+.matrixLableTop {
+  background: none;
+  border: none;
+  color: black;
+  width: 80px;
+  height: 25px;
+  text-align: center;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 25px;
+  opacity: 1;
+}
+
+.matrixLableTopStart {
+  background: none;
+  border: none;
+  color: white;
+  width: 62px;
+  height: 25px;
+  text-align: center;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 25px;
+  opacity: 0;
+}
+
+label {
+  display: inline-block;
+  line-height: 2.2em;
+  padding: 0 0.62em;
+  text-align: center;
+  font-size: 18px;
+  font-family: "Arial", Arial, sans-serif;
+}
+</style>
+</head>
+<body>
+
+<h1>Network Equalisation</h1>
+<p>Simulates the the activation equalisation in a directed weighted network using Sellberg's operator.</p>
+
+
+<!--SVG-->
+<div id='NetworkSpace'>
+<svg id='NetworkSVG' width='1200' height='800' ><!--onload="movable(evt)"-->
+
+<path id='background' d='M 1 1 H 1200 V 800 H 1 Z' fill='#D3D3D3' stroke='white' stroke-width='2'></path>
+
+<text id="SVGtext">
+</text>
+
+</svg>
+</div>
+
+<br>
+
+<h2>Network Parameters:</h2>
+<p>
+<span class='matrixLable'>Number of Nodes &emsp;</span>
+<input type='number' id='NumNodes' class='button' style='width: 150px; height: 40px' title='The number of nodes in the network' min='0' value='5' step='1' oninput='NodesUpdate()'>
+</p>
+<p>
+<span class='matrixLable'>Node Arrangement &emsp;</span>
+<button id='mode0' class='button' style='width: 150px; height: 40px' onclick='arrangement(0)' disabled title='Arranges the nodes in a circular pattern'>Circular</button> &emsp;
+<button id='mode1' class='button' style='width: 150px; height: 40px' onclick='arrangement(1)' title='Arranges nodes randomly'>Random</button> &emsp;
+<button id='mode2' class='button' style='width: 150px; height: 40px' onclick='arrangement(2)' title='Arranges the nodes in a bipartite network'>Layered</button> &emsp;
+<button id='mode3' class='button' style='width: 150px; height: 40px' onclick='arrangement(3)' title='Arranges the nodes in distinct layers similar to an Artificial Neural Network'>ANN</button>
+</p>
+<div id='ANNprop' style='display: none'>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+<span class='matrixLable'>Input Max: </span>
+<input type='number' id='ANNin' class='button' style='width: 74px; height: 40px' title='The maximal number of input nodes in the ANN network' min='1' value='3' step='1' oninput='NodesUpdate()'> &emsp;
+<span class='matrixLable'>Hidden Max: </span>
+<input type='number' id='ANNhid' class='button' style='width: 74px; height: 40px' title='The maximal number of hidden layer nodes in the ANN network' min='1' value='5' step='1' oninput='NodesUpdate()'> &emsp;
+<span class='matrixLable'>Output Max: </span>
+<input type='number' id='ANNout' class='button' style='width: 74px; height: 40px' title='The maximal number of output nodes in the ANN network' min='1' value='2' step='1' oninput='NodesUpdate()'>
+</div>
+<!--
+<button class='button' onclick='updateMatrix()' title='Updates the number of nodes in the network'>Update Network</button>
+-->
+
+<h2>Node Activation:</h2>
+<div id='NodeHeading' style='white-space: nowrap'>
+<input type='number' class='matrixLableTopStart' disabled value='0' step='1'>
+</div>
+<div id='NodeActivationLabel' style='white-space: nowrap'>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+</div>
+<div id='NodeActivation' style='white-space: nowrap'>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+</div>
+
+<br>
+
+<h2>Adjacency Matrix:</h2>
+<div id='AdjacencyMatrix' style='white-space: nowrap'>
+<div id='MatrixHeading'>
+<input type='number' class='matrixLableTopStart' disabled value='0' step='1'>
+</div>
+</div>
+
+<br>
+
+<p>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+<span class='matrixLable'>Weight Interval &emsp; Min: </span>
+<input type='number' id='randMin' class='button' oninput='updateMatrixProperties()' style='width: 74px; height: 40px' title='The minimum possible randomised weight value' min='-1' value='0' step='0.1'>
+<span class='matrixLable'>&ensp; Max: </span>
+<input type='number' id='randMax' class='button' oninput='updateMatrixProperties()' style='width: 74px; height: 40px' title='The maximum possible randomised weight value' max='1' value='1' step='0.1'>
+<span class='matrixLable'>&ensp; Step: </span>
+<input type='number' id='randStep' class='button' oninput='updateMatrixProperties()' style='width: 74px; height: 40px' title='The number of steps between the minimum and maximum weight values. If "0", no step restriction is applied.' min='0' value='0' step='1'>
+</p>
+
+<h2>Randomise Weights:</h2>
+<p>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+<input type='number' id='randPArc' class='button' style='width: 150px; height: 40px' title='The probability of a connection between two nodes' min='0' max='1' value='0.5' step='0.05'>
+<span class='matrixLable'>&ensp; Probability of Arc Between Nodes</span>
+</p>
+<p>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+<input type='number' id='randPDArc' class='button' style='width: 150px; height: 40px' title='The probability of a double connection between two nodes' min='0' max='1' value='1' step='0.05'>
+<span class='matrixLable'>&ensp; Probability of Double Arcs Between Nodes</span>
+</p>
+<p>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+<button class='button' onclick='randomise()' style='width: 630px; height: 40px' title='Randomises the Adjacency Matrix depending on the set parameters'>Randomise</button>
+</p>
+
+<h2>Customisation:</h2>
+<p>
+<input type='number' class='matrixLable' style='color:white' disabled value='0' step='1'>
+<button id='showButton' class='button' onclick='showSettings()' style='width: 326px; height: 40px' title='Show the customisation options below'>Show</button>
+</p>
+
+<div id='settings' style='display: none'>
+<p><span class='matrixLable'>Add Label: </span>
+<input type='text' id='textToAdd' class='button' style='width: 200px; height: 40px' title='Write text to be added as label'>
+<button class='button' onclick='addText()' style='width: 74px; height: 40px' title='Add free label to canvas'>Add</button>&emsp;
+<input type='number' id='chooseNodeText' class='button' style='width: 74px; height: 40px' title='Select which node to add label' min='0' max='4' value='0' step='1'>
+<button class='button' onclick='addTextToNode()' style='width: 74px; height: 40px' title='Apply label to selected node'>Apply</button></p>
+
+<p><span class='matrixLable'>Specific Node Colour: </span>
+<input type='color' id='specCol' style='border: none; background-color: #FFFFFF; height: 40px; vertical-align: -9px' value='#82C785'>
+<input type='number' id='chooseNode' class='button' style='width: 74px; height: 40px' title='Select which node to customise' min='0' max='4' value='0' step='1'>
+<button class='button' onclick='colourANode()' style='width: 74px; height: 40px' title='Apply customisation'>Apply</button></p>
+
+<p><span class='matrixLable'>Background Colour: </span>
+<input type='color' id='backCol' style='border: none; background-color: #FFFFFF; height: 40px; vertical-align: -9px' value='#D3D3D3' onchange='newColours()'></p>
+
+<p><span class='matrixLable'>Fill Colour: </span>
+<input type='color' id='deadCol' style='border: none; background-color: #FFFFFF; height: 40px; vertical-align: -9px' value='#82C785' onchange='newColours()'></p>
+
+<p><span class='matrixLable'>Border Colour: </span>
+<input type='color' id='bordCol' style='border: none; background-color: #FFFFFF; height: 40px; vertical-align: -9px' value='#000000' onchange='newColours()'></p>
+
+<p><span class='matrixLable'>Activation Colour: </span>
+<input type='color' id='actCol' style='border: none; background-color: #FFFFFF; height: 40px; vertical-align: -9px' value='#DDDD00' onchange='newColours()'></p>
+
+<p><span class='matrixLable'>Negative Activation Colour: </span>
+<input type='color' id='negCol' style='border: none; background-color: #FFFFFF; height: 40px; vertical-align: -9px' value='#27B1FF' onchange='newColours()'>
+<button class='button' onclick='autoNegColour()' style='width: 74px; height: 40px' title='Auto generate negative activation colour from the determined actrivation colour and its neutral fill colour'>Auto</button></p>
+
+<button class='button' style='width: 150px; height: 40px' onclick='resetSettings()' title='Resets all customisation to the original values'>Reset</button>
+</div>
+
+<h2>Save & Load Network:</h2>
+<p>
+<span class='matrixLable'>Save Network &emsp;</span>
+<button class='button' onclick='save()' style='width: 326px; height: 40px' title='Save and download the network architecture as a actNet-file'>Save</button>
+</p>
+<p>
+<span class='matrixLable'>Load Network &emsp;</span>
+
+<label for='fileSelect' class='button' style='width: 142px; height: 34px' title='Chose an actNet file to upload'>Chose file</label>
+<input type='file' id='fileSelect' class='button' style='display: none' onchange='load()' accept='.actNet'> &emsp;
+
+<label for='upload' class='button' style='width: 142px; height: 34px' title='Upload and build a network architecture from file'>Upload</label>
+<button id='upload' onclick='upload()' style='display: none'>Upload</button>
+&emsp;
+<text id='fileInfo'>No selected file...</text>
+</p>
+
+<!--Information display-->
+<p id='info' title=''></p>
