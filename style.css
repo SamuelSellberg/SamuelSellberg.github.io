@@ -1,24 +1,76 @@
-.w3-theme-light {color:#000 !important; background-color:#f0f0f0 !important}
-.w3-theme-dark {color:#fff !important; background-color:#040404 !important}
-.w3-theme-action {color:#fff !important; background-color:#040404 !important}
+.w3-theme-light {
+  color: #000 !important;
+  background-color: #f0f0f0 !important;
+}
 
-.w3-theme {color:#fff !important; background-color:#080808 !important}
-.w3-theme2 {color:#fff !important; background-color:#151515 !important}
-.w3-text-theme {color:#080808 !important}
-.w3-border-theme {border-color:#080808 !important}
+.w3-theme-dark {
+  color: #fff !important;
+  background-color: #040404 !important;
+}
 
-.w3-hover-theme:hover {color:#fff !important; background-color:#080808 !important}
-.w3-hover-text-theme:hover {color:#080808 !important}
-.w3-hover-border-theme:hover {border-color:#080808 !important}
+.w3-theme-action {
+  color: #fff !important;
+  background-color: #040404 !important;
+}
 
-* {box-sizing: border-box;}
+.w3-theme {
+  color: #fff !important;
+  background-color: #080808 !important;
+}
 
+.w3-theme2 {
+  color: #fff !important;
+  background-color: #151515 !important;
+}
+
+.w3-text-theme {
+  color: #080808 !important;
+}
+
+.w3-border-theme {
+  border-color: #080808 !important;
+}
+
+.w3-hover-theme:hover {
+  color: #fff !important;
+  background-color: #080808 !important;
+}
+
+.w3-hover-text-theme:hover {
+  color: #080808 !important;
+}
+
+.w3-hover-border-theme:hover {
+  border-color: #080808 !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.serifText {
+  font-family: Garamond, Georgia, "Times New Roman", Times, serif;
+  letter-spacing: 6px; 
+}
+
+.textFormat {
+  font-family: "Trebuchet MS", TaHoma, Verdana, Arial, sans-serif;
+  font-size: 16px;
+  letter-spacing: 2px;
+}
+
+.importantBlock {
+  color: #ddd;
+  text-align: justify;
+  width: 80%
+}
 
 /* CSS for comparing images */
 
 .img-comp-container {
   position: relative;
-  height: 400px; /* should be the same height as the images */
+  height: 300px;
+  /* should be the same height as the images */
 }
 
 .img-comp-img {
@@ -29,11 +81,11 @@
 }
 
 .backglow {
-	box-shadow: 0px 0px 40px 20px #151515;
+  /* box-shadow: 0px 0px 40px 20px #151515; */
 }
 
 .img-comp-container:hover .backglow {
-	box-shadow: 0px 0px 40px 10px #262624;
+  box-shadow: 0px 0px 40px 10px #262624;
 }
 
 .img-comp-img img {
@@ -53,6 +105,87 @@
   border-radius: 50%;
 }
 
+
+/* CSS for auto-slide */
+
+.slidePresent_container {
+  position: relative;
+  width: 450px;
+}
+
+.slidePresent_backImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: 5s ease;
+  box-shadow: 0px 0px 60px -10px #fff1;
+}
+
+.slidePresent_overlayRight {
+  position: absolute;
+  bottom: 0;
+  left: 100%;
+  right: 0;
+  background-color: #008CBA;
+  overflow: hidden;
+  width: 0;
+  height: 100%;
+  transition: .5s ease;
+}
+
+.slidePresent_overlayLeft {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #008CBA;
+  overflow: hidden;
+  width: 0;
+  height: 100%;
+  transition: .5s ease;
+}
+
+.slidePresent_container:hover .slidePresent_overlayRight {
+  width: 100%;
+  left: 0;
+}
+
+.slidePresent_container:hover .slidePresent_overlayLeft {
+  width: 100%;
+  left: 0;
+}
+
+.slidePresent_container:hover .slidePresent_backImage {
+  box-shadow: 0px 0px 60px -10px #9ff6;
+}
+
+.slidePresent_text {
+  color: white;
+  /*font-family: Georgia, "Times New Roman", Times, serif;*/
+  /*font-family: Verdana, sans-serif;*/
+  font-family: Garamond, Georgia, "Times New Roman", Times, serif;
+  letter-spacing: 4px; 
+  font-size: 30px;
+  position: absolute;
+  top: 80%;
+  left: 50%;
+  -webkit-transform: translate(-50%, -50%);
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.slidePresent_slideImage {
+  position: absolute;
+  width: auto;
+  height: 100%;
+  top: 50%;
+  left: 50%;
+  -webkit-transform: translate(-50%, -50%);
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
 
 /* CSS for portfolio */
 
@@ -79,7 +212,7 @@ h1 {
 
 /* Add padding BETWEEN each column (if you want) */
 .row,
-.row > .column {
+.row>.column {
   padding: 8px;
 }
 
@@ -100,18 +233,36 @@ h1 {
 .content {
   /* background-color: #151515; */
   padding: 10px;
+  position: relative;
 }
 
 /* Responsive layout - makes a two column-layout instead of four columns */
-@media screen and (max-width: 2600px) { /* 4 × width + 200px */
+@media screen and (max-width: 2600px) {
+
+  /* 4 × width + 200px */
   .column {
     width: 50%;
   }
 }
 
 /* Responsive layout - makes the two columns stack on top of each other instead of next to each other */
-@media screen and (max-width: 1300px) { /* 2 × width + 100px */
+@media screen and (max-width: 1300px) {
+
+  /* 2 × width + 100px */
   .column {
     width: 100%;
   }
+}
+
+.portfolioLink {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+a:link {
+  text-decoration: none;
 }
