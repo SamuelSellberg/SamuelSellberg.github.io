@@ -65,52 +65,13 @@
   width: 80%
 }
 
-/* CSS for comparing images */
-
-.img-comp-container {
-  position: relative;
-  height: 300px;
-  /* should be the same height as the images */
-}
-
-.img-comp-img {
-  position: absolute;
-  width: auto;
-  height: auto;
-  overflow: hidden;
-}
-
-.backglow {
-  /* box-shadow: 0px 0px 40px 20px #151515; */
-}
-
-.img-comp-container:hover .backglow {
-  box-shadow: 0px 0px 40px 10px #262624;
-}
-
-.img-comp-img img {
-  display: block;
-  vertical-align: middle;
-}
-
-.img-comp-slider {
-  position: absolute;
-  z-index: 9;
-  cursor: ew-resize;
-  /* set the appearance of the slider: */
-  width: 40px;
-  height: 200px;
-  background-color: #080808;
-  opacity: 0;
-  border-radius: 50%;
-}
-
-
 /* CSS for auto-slide */
 
 .slidePresent_container {
   position: relative;
-  width: 450px;
+  /* width: 450px; */
+  width: max;
+  /* font-size: width; */
 }
 
 .slidePresent_backImage {
@@ -161,11 +122,12 @@
 
 .slidePresent_text {
   color: white;
-  /*font-family: Georgia, "Times New Roman", Times, serif;*/
-  /*font-family: Verdana, sans-serif;*/
+  /* font-family: Georgia, "Times New Roman", Times, serif; */
+  /* font-family: Verdana, sans-serif; */
   font-family: Garamond, Georgia, "Times New Roman", Times, serif;
   letter-spacing: 4px; 
   font-size: 30px;
+  /* font-size: 2em; */
   position: absolute;
   top: 80%;
   left: 50%;
@@ -213,7 +175,8 @@ h1 {
 /* Add padding BETWEEN each column (if you want) */
 .row,
 .row>.column {
-  padding: 8px;
+  /* Half the padding between each content box */
+  padding: 20px;
 }
 
 /* Create four equal columns that floats next to each other */
@@ -232,12 +195,13 @@ h1 {
 /* Content */
 .content {
   /* background-color: #151515; */
+  /* Padding around the whole content */
   padding: 10px;
   position: relative;
 }
 
 /* Responsive layout - makes a two column-layout instead of four columns */
-@media screen and (max-width: 2600px) {
+@media screen and (max-width: 1800px) {
 
   /* 4 × width + 200px */
   .column {
@@ -246,7 +210,7 @@ h1 {
 }
 
 /* Responsive layout - makes the two columns stack on top of each other instead of next to each other */
-@media screen and (max-width: 1300px) {
+@media screen and (max-width: 900px) {
 
   /* 2 × width + 100px */
   .column {
@@ -265,4 +229,20 @@ h1 {
 
 a:link {
   text-decoration: none;
+}
+
+.detection:before {
+  content: 'unknown';
+}
+
+@media(hover) {
+  .detection:before {
+    content: 'yes';
+  }
+}
+
+@media (hover: none) {
+  .detection:before {
+    content: 'no';
+  }
 }
