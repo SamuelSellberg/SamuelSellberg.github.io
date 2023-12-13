@@ -230,19 +230,3 @@ h1 {
 a:link {
   text-decoration: none;
 }
-
-.detection:before {
-  content: 'unknown';
-}
-
-@media(hover) {
-  .detection:before {
-    content: 'yes';
-  }
-}
-
-@media (hover: none) {
-  .detection:before {
-    content: 'no';
-  }
-}
