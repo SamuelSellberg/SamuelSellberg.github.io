@@ -57,6 +57,7 @@
   font-family: "Trebuchet MS", TaHoma, Verdana, Arial, sans-serif;
   font-size: 16px;
   letter-spacing: 2px;
+  text-align: justify;
 }
 
 .importantBlock {
@@ -176,7 +177,7 @@ h1 {
 .row,
 .row>.column {
   /* Half the padding between each content box */
-  padding: 20px;
+  padding: 60px;
 }
 
 /* Create four equal columns that floats next to each other */
