@@ -1,0 +1,25 @@
+.w3-theme-DI {
+    color: #d68383 !important;
+    background-color: #e9edca !important;
+}
+
+.w3-button-DI {
+    color: #d68383 !important;
+    border-radius: 20px;
+    transition: .5s ease;
+}
+
+.w3-button-DI:hover {
+    color: #0c4808 !important;
+    background-color: #f8d8bf !important;
+}
+
+.DI_text {
+    /* Uppdatera */
+    font-family: "Prosto One", TaHoma, Verdana, Arial, sans-serif;
+    font-size: 30px;
+    letter-spacing: 2px;
+    text-align: left;
+    color: #fff;
+    filter: drop-shadow( 0px 2px 2px #0007)
+}
