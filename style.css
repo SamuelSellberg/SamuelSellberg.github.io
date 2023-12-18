@@ -234,23 +234,9 @@ a:link {
 
 /* parallax "viewport" */
 .parallax {
-  /* 
-  height: 100vh;
-
-  overflow-x: hidden;
-  overflow-y: auto;
-
-  perspective: 1px;
-
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  */
-  height: 300px;
+  height: 600px;
   width: 100%;
   overflow: hidden;
   object-fit: cover;
-  object-position: 0 0%;
+  object-position: 0 100%;
 }
