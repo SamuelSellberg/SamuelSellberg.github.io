@@ -20,9 +20,16 @@ function parallax(position) {
     }
 }
 
+function scrollToCenterImage(imageID) {
+    let rect = document.getElementById(imageID).getBoundingClientRect();
+    let windowHeight = window.innerHeight;
+    window.scrollTo(0,(rect.top + rect.bottom - windowHeight)/2);
+}
+
 document.addEventListener("scroll", (event) => {
     //console.log(window.scrollY);
     parallax(window.scrollY);
 })
 
 
+// window.onload = scrollToCenterImage("focusImage");
