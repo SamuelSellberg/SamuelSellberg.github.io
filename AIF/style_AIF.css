@@ -1,18 +1,50 @@
 .w3-theme-AM {
-    color: #fff !important;
-    background-color: #000 !important;
+    color: #000 !important;
+    background-color: #fff !important;
 }
 
 .w3-button-AM {
-    color: #fff !important;
+    color: #000 !important;
     border-radius: 0px;
-    transition: .15s ease;
+    transition: .3s ease;
+    animation-duration: 5s;
+    animation-iteration-count: infinite;
+    animation-play-state: running;
+    transform-origin: bottom;
 }
 
 .w3-button-AM:hover {
-    color: #191319 !important;
-    background-color: #dd84ddaa !important;
-    filter: drop-shadow( 0px 0px 10px #0ff7)
+    color: #fff !important;
+    background-color: #555 !important;
+    filter: drop-shadow( 0px 0px 10px #ccc)
+    
+}
+
+.glitch:hover {
+    animation-name: glitch;
+    animation-timing-function: 0;
+}
+
+@keyframes glitch {
+  0%   { transform: translateX(0);}
+
+  10.5%   { transform: translateX(0);}
+  11%  { transform: translateX(10px) skewX(-10deg);}
+  11.5%  { transform: translateX(0);}
+
+  60.5%   { transform: translateX(0);}
+  61%  { transform: translateX(10px) skewX(-10deg);}
+  61.5%  { transform: translateX(0) skewX(-70deg);}
+  62%  { transform: translateX(-30px) skewX(-70deg);}
+  62.5%  { transform: translateX(0) skewX(0deg);}
+
+  74.5%   { transform: translateX(0);}
+  75%  { transform: translateX(2px) skewX(-6deg);}
+  80%  { transform: translateX(2px) skewX(-6deg);}
+  80.5%  { transform: translateX(-10px) skewX(-6deg);}
+  81%  { transform: translateX(0);}
+
+  100% { transform: translateX(0);}
 }
 
 .AM_text {
@@ -24,3 +56,14 @@
     color: #fff;
     filter: drop-shadow( 0px 2px 2px #0007)
 }
+
+
+
+.child {
+    align-self: flex-end;
+    width: 100px;
+    height: 100px;
+    background: #FFB6C1;
+    
+}
+
