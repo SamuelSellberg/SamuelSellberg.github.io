@@ -1,0 +1,26 @@
+.w3-theme-AM {
+    color: #fff !important;
+    background-color: #000 !important;
+}
+
+.w3-button-AM {
+    color: #fff !important;
+    border-radius: 0px;
+    transition: .15s ease;
+}
+
+.w3-button-AM:hover {
+    color: #191319 !important;
+    background-color: #dd84ddaa !important;
+    filter: drop-shadow( 0px 0px 10px #0ff7)
+}
+
+.AM_text {
+    /* Uppdatera */
+    font-family: "Prosto One", TaHoma, Verdana, Arial, sans-serif;
+    font-size: 30px;
+    letter-spacing: 2px;
+    text-align: left;
+    color: #fff;
+    filter: drop-shadow( 0px 2px 2px #0007)
+}
