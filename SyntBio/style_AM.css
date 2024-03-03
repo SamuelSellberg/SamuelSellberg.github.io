@@ -15,6 +15,14 @@
     filter: drop-shadow( 0px 0px 10px #0ff7)
 }
 
+.charge {
+    transition: 5s linear;
+}
+
+.charge:hover {
+    filter: drop-shadow( -3px -1px 4px #dd84ddff);
+}
+
 .AM_text {
     /* Uppdatera */
     font-family: "Prosto One", TaHoma, Verdana, Arial, sans-serif;

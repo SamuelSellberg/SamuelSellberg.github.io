@@ -1,21 +1,84 @@
-.w3-theme-AM {
-    color: #fff !important;
-    background-color: #000 !important;
+.w3-theme-JASI {
+    color: #000 !important;
+    background-color: #fff !important;
 }
 
-.w3-button-AM {
-    color: #fff !important;
+.w3-button-JASI {
+    color: #424242;
     border-radius: 0px;
-    transition: .15s ease;
+    transition: 0.8s ease;
+    animation-duration: 5s;
+    animation-iteration-count: infinite;
+    animation-play-state: running;
+    filter: grayscale(10%);
 }
 
-.w3-button-AM:hover {
-    color: #191319 !important;
-    background-color: #dd84ddaa !important;
-    filter: drop-shadow( 0px 0px 10px #0ff7)
+.w3-button-JASI:hover {
+    color: #888;
+    /*background-color: #dd84ddaa !important;*/
+    filter: drop-shadow( 0px 0px 1px #0007);
 }
 
-.AM_text {
+
+.rainbow:hover {
+    animation-name: rainbow;
+    animation-timing-function: linear;
+}
+
+@keyframes rainbow {
+  0%   { color: #424242;}
+  5% { color: #684844;}
+  10%   { color: #8d4b46;}
+  15% { color: #b24c46;}
+  20%   { color: #d84945;}
+  25% { color: #ff4242;}
+  30%   { color: #f17843;}
+  35% { color: #dd9f44;}
+  40%   { color: #c2c144;}
+  45% { color: #98e144;}
+  50% { color: #42e742;}
+  55% { color: #2de18a;}
+  60%   { color: #21c2b2;}
+  65% { color: #23a0d0;}
+  70%   { color: #3179e9;}
+  75% { color: #4242ff;}
+  80%   { color: #3f4ad8;}
+  85% { color: #3d4cb1;}
+  90%   { color: #3e4c8c;}
+  95% { color: #404867;}
+  100% { color: #424242;}
+}
+
+.rainbowS:hover {
+    animation-name: rainbowS;
+    animation-timing-function: linear;
+}
+
+@keyframes rainbowS {
+    0%    { filter: drop-shadow( 0px 0px 1px #42424200);}
+    5%    { filter: drop-shadow( 0px 0px 1px #68484416);}
+    10%   { filter: drop-shadow( 0px 0px 1px #8d4b4648);}
+    15%   { filter: drop-shadow( 0px 0px 1px #b24c4680);}
+    20%   { filter: drop-shadow( 0px 0px 1px #d84945be);}
+    25%   { filter: drop-shadow( 0px 0px 1px #ff4242);}
+    30%   { filter: drop-shadow( 0px 0px 1px #f17843);}
+    35%   { filter: drop-shadow( 0px 0px 1px #dd9f44);}
+    40%   { filter: drop-shadow( 0px 0px 1px #c2c144);}
+    45%   { filter: drop-shadow( 0px 0px 1px #98e144);}
+    50%   { filter: drop-shadow( 0px 0px 1px #42e742);}
+    55%   { filter: drop-shadow( 0px 0px 1px #2de18a);}
+    60%   { filter: drop-shadow( 0px 0px 1px #21c2b2);}
+    65%   { filter: drop-shadow( 0px 0px 1px #23a0d0);}
+    70%   { filter: drop-shadow( 0px 0px 1px #3179e9);}
+    75%   { filter: drop-shadow( 0px 0px 1px #4242ff);}
+    80%   { filter: drop-shadow( 0px 0px 1px #3f4ad8be);}
+    85%   { filter: drop-shadow( 0px 0px 1px #3d4cb180);}
+    90%   { filter: drop-shadow( 0px 0px 1px #3e4c8c48);}
+    95%   { filter: drop-shadow( 0px 0px 1px #40486716);}
+    100%  { filter: drop-shadow( 0px 0px 1px #42424200);}
+  }
+
+.JASI_text {
     /* Uppdatera */
     font-family: "Prosto One", TaHoma, Verdana, Arial, sans-serif;
     font-size: 30px;

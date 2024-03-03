@@ -1,21 +1,45 @@
-.w3-theme-AM {
+.w3-theme-PCA {
     color: #000 !important;
     background-color: #fff !important;
 }
 
-.w3-button-AM {
+.w3-button-PCA {
     color: #000 !important;
     border-radius: 0px;
-    transition: .15s ease;
+    transition: .1s ease;
 }
 
-.w3-button-AM:hover {
+.w3-button-PCA:hover {
     color: #191319 !important;
-    background-color: #dd84ddaa !important;
-    filter: drop-shadow( 0px 0px 10px #0ff7)
+    background-color: #FBD0A8 !important;
+    filter: drop-shadow( 0px 0px 10px #0002)
 }
 
-.AM_text {
+.w3-button-PCAalt {
+    color: #000 !important;
+    border-radius: 0px;
+    transition: .1s ease;
+}
+
+.w3-button-PCAalt:hover {
+    color: #191319 !important;
+    background-color: #ABFDFE !important;
+    filter: drop-shadow( 0px 0px 10px #0002)
+}
+
+.w3-button-PCAalt2 {
+    color: #000 !important;
+    border-radius: 0px;
+    transition: .1s ease;
+}
+
+.w3-button-PCAalt2:hover {
+    color: #191319 !important;
+    background-color: #AEFFCC !important;
+    filter: drop-shadow( 0px 0px 10px #0002)
+}
+
+.PCA_text {
     /* Uppdatera */
     font-family: "Prosto One", TaHoma, Verdana, Arial, sans-serif;
     font-size: 30px;
