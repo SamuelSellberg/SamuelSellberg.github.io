@@ -252,13 +252,13 @@ a:link {
 .linkedin {
   background-color: #fff;
   width: fit-content;
-  height: max-content;
-  vertical-align: top;
-  left: 50%;
+  height: fit-content;
+  display: inline-block;
   padding: 5px;
   border-radius: 10px;
 }
 
 .linkedin > * {
   margin: 2.5px;
+  vertical-align: top;
 }
