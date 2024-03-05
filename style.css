@@ -248,3 +248,15 @@ a:link {
   height: 300px;
   width: 500px;
 }
+
+.linkedin {
+  background-color: #fff;
+  width: fit-content;
+  left: 50%;
+  padding: 5px;
+  border-radius: 10px;
+}
+
+.linkedin > * {
+  margin: 2.5px;
+}
