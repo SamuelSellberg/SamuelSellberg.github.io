@@ -252,6 +252,7 @@ a:link {
 .linkedin {
   background-color: #fff;
   width: fit-content;
+  height: max-content;
   left: 50%;
   padding: 5px;
   border-radius: 10px;
@@ -259,5 +260,4 @@ a:link {
 
 .linkedin > * {
   margin: 2.5px;
-  height: auto;
 }
