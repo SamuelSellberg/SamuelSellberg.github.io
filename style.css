@@ -246,7 +246,7 @@ a:link {
 .socialButton:hover {
   width: 300px;
   max-width: fit-content;
-  transition: width 1.5s ease-in-out 0s;
+  transition: width 1.5s ease-in-out 0.1s;
 }
 
 .socialIcon {
