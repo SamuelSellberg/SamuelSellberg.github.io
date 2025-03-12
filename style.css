@@ -237,6 +237,7 @@ a:link {
   height: 50px;
   max-width: fit-content;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
   border: 0px;
   background-color: #0000;
