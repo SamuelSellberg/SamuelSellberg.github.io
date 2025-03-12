@@ -256,7 +256,8 @@ a:link {
 }
 
 .socialButton .socialButtonText {
-  opacity: 0;
+  /*opacity: 0;*/
+  opacity: 1;
   transition: opacity 0.2s ease-out 0s;
   position: relative;
   width: 100%;
