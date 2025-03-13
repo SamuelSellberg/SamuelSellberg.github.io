@@ -288,6 +288,15 @@ a:link {
   width: 500px;
 }
 
+.SS_socialButtonText {
+  font-family: Garamond, Georgia, "Times New Roman", Times, serif;
+  font-size: 20px;
+  font-weight: normal;
+  letter-spacing: 2px;
+  text-align: left;
+  color: #fff;
+}
+
 .linkedin {
   background-color: #fff;
   position: relative;

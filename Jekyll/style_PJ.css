@@ -27,3 +27,12 @@
     color: #fff;
     filter: drop-shadow( 0px 2px 2px #0007)
 }
+
+.PJ_socialButtonText {
+    font-family: Garamond, Georgia, "Times New Roman", Times, serif;
+    font-size: 20px;
+    font-weight: normal;
+    letter-spacing: 2px;
+    text-align: left;
+    color: #fff;
+}
